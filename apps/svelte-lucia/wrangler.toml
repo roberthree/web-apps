@@ -1,0 +1,4 @@
+[[d1_databases]]
+binding = "LUCIA_DB"
+database_name = "lucia-auth"
+database_id = "e3e0ab4d-8d25-4eeb-82bd-f70f90a27afb"
