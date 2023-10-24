@@ -1,5 +1,5 @@
 import { initializeLucia } from './lucia.js';
-import { generateRandomString, isWithinExpiration } from 'lucia/utils';
+import { io_page_html_string } from './io.js';
 
 export interface Env {
 	MESSAGES_AUTH_DB: D1Database;
@@ -45,14 +45,60 @@ async function create_json_response(): Promise<Response> {
 	);
 }
 
+async function create_io_page(): Promise<Response> {
+	return new Response(
+		io_page_html_string(),
+		{
+			status: 200,
+			headers: {
+				'content-type': 'text/html;charset=utf-8',
+			}
+		}
+	);
+}
+
+async function parse_username_password(request: Request): Promise<{username: string | undefined, password: string | undefined}> {
+	console.log(request.headers.get('content-type'));
+	switch(request.headers.get('content-type')) {
+		case 'application/x-www-form-urlencoded':
+			return request.formData().then(
+				data => {
+					return {
+						username: data.get('username') ?? undefined,
+						password: data.get('password') ?? undefined,
+					}
+				}
+			);
+		default:
+			return await request.json();
+	}
+}
+
+async function parse_recipient_message(request: Request): Promise<{recipient: string | undefined, message: string | undefined}> {
+	console.log(request.headers.get('content-type'));
+	switch(request.headers.get('content-type')) {
+		case 'application/x-www-form-urlencoded':
+			return request.formData().then(
+				data => {
+					return {
+						recipient: data.get('recipient') ?? undefined,
+						message: data.get('message') ?? undefined,
+					}
+				}
+			);
+		default:
+			return await request.json();
+	}
+}
+
 async function signup(
 	request: Request,
 	db_auth: D1Database,
 ): Promise<Response> {
-	const data = await request.json() as {username: string, password: string};
-	console.assert(data.username !== undefined, data);
-	console.assert(data.password !== undefined, data);
+	const data = await parse_username_password(request);
 	console.log(data);
+	if (typeof(data.username) !== 'string') throw new Error('USERNAME_UNDEFINED');
+	if (typeof(data.password) !== 'string') throw new Error('PASSWORD_UNDEFINED');
 	
 	const auth = initializeLucia(db_auth);
 	const user = await auth.createUser({
@@ -80,10 +126,10 @@ async function remove(
 	db_auth: D1Database,
 	db_data: D1Database,
 ): Promise<Response> {
-	const data = await request.json() as {username: string, password: string};
-	console.assert(data.username !== undefined, data);
-	console.assert(data.password !== undefined, data);
+	const data = await parse_username_password(request);
 	console.log(data);
+	if (typeof(data.username) !== 'string') throw new Error('USERNAME_UNDEFINED');
+	if (typeof(data.password) !== 'string') throw new Error('PASSWORD_UNDEFINED');
 	
 	const auth = initializeLucia(db_auth);
 	const key = await auth.useKey('username', data.username, data.password);
@@ -114,10 +160,10 @@ async function access(
 	db_auth: D1Database,
 	db_data: D1Database,
 ): Promise<Response> {
-	const data = await request.json() as {username: string, password: string};
-	console.assert(data.username !== undefined, data);
-	console.assert(data.password !== undefined, data);
+	const data = await parse_username_password(request);
 	console.log(data);
+	if (typeof(data.username) !== 'string') throw new Error('USERNAME_UNDEFINED');
+	if (typeof(data.password) !== 'string') throw new Error('PASSWORD_UNDEFINED');
 	
 	const auth = initializeLucia(db_auth);
 	const key = await auth.useKey('username', data.username, data.password);
@@ -145,10 +191,10 @@ async function send(
 	db_auth: D1Database,
 	db_data: D1Database,
 ): Promise<Response> {
-	const data = await request.json() as {recipient: string, message: string};
-	console.assert(data.recipient !== undefined, data);
-	console.assert(data.message !== undefined, data);
+	const data = await parse_recipient_message(request);
 	console.log(data);
+	if (typeof(data.recipient) !== 'string') throw new Error('RECIPIENT_UNDEFINED');
+	if (typeof(data.message) !== 'string') throw new Error('MESSAGE_UNDEFINED');
 	
 	const auth = initializeLucia(db_auth);
 	const key = await auth.getKey('username', data.recipient);
@@ -162,7 +208,7 @@ async function send(
 	console.assert(db_result.success, db_result);
 	console.log(db_result.meta);
 
-	return new Response('SEND', {status: 200});
+	return new Response('MESSAGE_SENT', {status: 200});
 }
 
 export default {
@@ -184,6 +230,8 @@ export default {
 							return await create_html_response();
 						case '/json':
 							return await create_json_response();
+						case '/io':
+							return await create_io_page();
 						default:
 							return new Response(null, {status: 404});
 					}
